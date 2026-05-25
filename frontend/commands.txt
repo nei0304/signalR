@@ -1,0 +1,4 @@
+npm create vite@latest frontend -- --template react-ts
+cd frontend
+npm i @microsoft/signalr
+npm i jwt-decode

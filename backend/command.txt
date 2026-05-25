@@ -1,0 +1,18 @@
+#criar
+dotnet new web -n backend
+cd backend
+dotnet add package Microsoft.AspNetCore.SignalR
+dotnet add package Microsoft.AspNetCore.Authentication.JwtBearer
+dotnet add package Microsoft.EntityFrameworkCore.Sqlite
+dotnet add package Microsoft.EntityFrameworkCore.Tools
+dotnet add package System.IdentityModel.Tokens.Jwt
+
+dotnet add package BCrypt.Net-Next
+dotnet ef migrations add Initial
+dotnet ef database update
+dotnet run
+
+#rodar
+dotnet run
+
+dotnet new gitignore

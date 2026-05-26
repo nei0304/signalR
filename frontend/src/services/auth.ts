@@ -2,9 +2,23 @@ import { jwtDecode } from "jwt-decode";
 
 export type AuthMode = "login" | "register";
 
-export type LoginResponse = {
-  token: string;
+export type AuthUser = {
+  id: number;
   username: string;
+};
+
+export type LoginResponse = {
+  accessToken: string;
+  refreshToken: string;
+  user: AuthUser;
+};
+
+type RawLoginResponse = {
+  accessToken?: string;
+  token?: string;
+  refreshToken?: string;
+  user?: AuthUser | string;
+  username?: string;
 };
 
 type TokenPayload = {
@@ -20,7 +34,7 @@ export async function requestAuth(
   mode: AuthMode,
   username: string,
   password: string,
-) {
+): Promise<LoginResponse> {
   const payload = {
     username,
     passwordHash: password,
@@ -45,17 +59,41 @@ export async function requestAuth(
   });
 
   if (!loginResponse.ok) {
-    //sommente para teste, pois ainda não tem banco, remove depois
-    return {
-      token:
-        "fgkfdgireotgertre445454543243erertwre6t789rtg7fd3v1c32v4f7987r9qt",
-      username: payload.username,
-    };
-    
-    // throw new Error("Login invalido. Confira usuario e senha.");
+    throw new Error("Login invalido. Confira usuario e senha.");
   }
 
-  return (await loginResponse.json()) as LoginResponse;
+  const raw = (await loginResponse.json()) as RawLoginResponse;
+
+  const accessToken =
+    typeof raw.accessToken === "string" && raw.accessToken
+      ? raw.accessToken
+      : typeof raw.token === "string" && raw.token
+        ? raw.token
+        : "";
+
+  const usernameFromUser =
+    typeof raw.user === "object" && raw.user !== null
+      ? raw.user.username
+      : typeof raw.user === "string"
+        ? raw.user
+        : "";
+
+  const resolvedUsername =
+    usernameFromUser ||
+    (typeof raw.username === "string" ? raw.username : "") ||
+    readUsernameFromToken(accessToken);
+
+  return {
+    accessToken,
+    refreshToken: typeof raw.refreshToken === "string" ? raw.refreshToken : "",
+    user: {
+      id:
+        typeof raw.user === "object" && raw.user !== null && typeof raw.user.id === "number"
+          ? raw.user.id
+          : 0,
+      username: resolvedUsername,
+    },
+  };
 }
 
 export function readUsernameFromToken(token: string) {

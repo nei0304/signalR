@@ -1,20 +1,21 @@
 # Frontend - Chat React + SignalR
 
-Aplicacao React para chat em tempo real com SignalR, autenticacao por JWT e persistencia de sessao no navegador.
+Aplicacao React para autenticacao, entrada em sala e chat em tempo real via SignalR.
 
 ## Visao geral
 
-O frontend possui tres fluxos principais:
+Fluxo principal da interface:
 
-- autenticacao (login/cadastro)
-- escolha de sala
-- chat em tempo real
+- Login ou cadastro
+- Escolha de sala
+- Conversa em tempo real
 
-Quando autenticado, o app conecta no Hub SignalR e sincroniza historico/mensagens da sala.
+Quando autenticado, o app conecta no hub e carrega historico da sala.
 
-## Tecnologias
+## Stack
 
-- React 19 + TypeScript
+- React 19
+- TypeScript
 - Vite
 - @microsoft/signalr
 - jwt-decode
@@ -22,91 +23,90 @@ Quando autenticado, o app conecta no Hub SignalR e sincroniza historico/mensagen
 
 ## Estrutura
 
-- src/App.tsx: fluxo de telas e estados principais
-- src/hooks/useSignalR.ts: conexao SignalR, eventos e envio de mensagem
-- src/services/auth.ts: chamadas de register/login e decode do token
+- src/App.tsx: fluxo das telas e estado principal
+- src/hooks/useSignalR.ts: conexao, eventos e envio de mensagens
+- src/services/auth.ts: chamadas de auth usadas na tela principal
 - src/services/session.ts: persistencia de sessao no localStorage
-- src/App.test.tsx: testes de integracao do fluxo principal
-- src/hooks/useSignalR.test.ts: testes de reconexao e comportamento do hook
+- src/App.test.tsx: testes de interface e fluxo principal
+- src/hooks/useSignalR.test.ts: testes do hook de SignalR
 
-## Requisitos
+## Pre-requisitos
 
 - Node.js 20+
 - npm 10+
-- backend rodando localmente
+- Backend em execucao
 
-## Configuracao
+## Configuracao de ambiente
 
-Opcionalmente, defina a URL da API via variavel de ambiente:
+No diretorio frontend, criar arquivo .env com:
 
-```bash
-copy .env.example .env
-```
-
-No `.env`, use:
-
-```bash
 VITE_API_BASE_URL=http://localhost:5267
-```
 
-Se nao definir, o frontend usa por padrao `http://localhost:5000`.
+Observacao:
+
+- Se a variavel nao estiver definida, o codigo usa fallback para http://localhost:5000.
+- Em desenvolvimento deste projeto, recomenda-se sempre configurar 5267.
 
 ## Como executar
 
 1. Instalar dependencias:
 
-```bash
 npm install
-```
 
-2. Rodar em desenvolvimento:
+2. Iniciar servidor de desenvolvimento:
 
-```bash
 npm run dev
-```
 
-3. Acessar no navegador:
+3. Abrir no navegador:
 
-- http://localhost:5173
+http://localhost:5173
 
 ## Scripts
 
-- npm run dev: inicia servidor de desenvolvimento
+- npm run dev: inicia Vite em modo dev
 - npm run build: type-check e build de producao
-- npm run preview: preview do build
-- npm run lint: lint do projeto
-- npm run test: modo watch dos testes
+- npm run preview: sobe build local
+- npm run lint: roda ESLint
+- npm run test: testes em modo watch
 - npm run test:run: executa testes uma vez
 
 ## Integracao com backend
 
-### Endpoints HTTP usados
+Base URL:
+
+- VITE_API_BASE_URL
+
+Rotas HTTP usadas:
 
 - POST /register
 - POST /login
+- POST /refresh
+- POST /logout
 
-### Hub SignalR usado
+Hub usado:
 
 - /chat
 
-### Eventos recebidos
+Eventos recebidos no cliente:
 
 - LoadHistory
 - ReceiveMessage
 - UserJoined
+- UserTyping
+- UserLeft
 
-### Metodos invocados
+Metodos invocados pelo cliente:
 
 - JoinRoom
 - SendMessage
 
-## Persistencia de sessao
+## Sessao local
 
-Chave usada no localStorage:
+Chave localStorage:
 
 - signalr-chat-session
 
-Dados salvos:
+Campos persistidos:
 
 - token
 - username
@@ -115,25 +115,30 @@ Dados salvos:
 
 ## Testes
 
-Executar suite completa:
+Rodar suite completa:
 
-```bash
 npm run test:run
-```
 
 Cobertura atual inclui:
 
-- autenticacao com sucesso
+- autenticacao
 - erro de login
 - entrada em sala
 - envio de mensagem
 - restauracao de sessao
 - troca de conta
-- reconexao do SignalR com rejoin
-- fechamento de conexao
-- tratamento de falha de start
-- cleanup do hook no unmount
+- reconexao e cleanup do SignalR
 
-## Observacoes
+## Troubleshooting
 
-- Durante o build pode aparecer warning de INVALID_ANNOTATION em dependencia do SignalR. Isso nao bloqueia compilacao nem execucao do app.
+### Erro de CORS
+
+- Confirme frontend em localhost:5173 ou 127.0.0.1:5173
+- Confirme backend em 5267
+- Confirme VITE_API_BASE_URL apontando para http://localhost:5267
+
+### Falha ao conectar no chat
+
+- Verifique token valido
+- Verifique endpoint /chat acessivel no backend
+- Verifique logs do backend para erros no negotiate

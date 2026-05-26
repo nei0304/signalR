@@ -1,18 +1,21 @@
 #criar
 dotnet new web -n backend
 cd backend
-dotnet add package Microsoft.AspNetCore.SignalR
 dotnet add package Microsoft.AspNetCore.Authentication.JwtBearer
-dotnet add package Microsoft.EntityFrameworkCore.Sqlite
+dotnet add package Pomelo.EntityFrameworkCore.MySql
 dotnet add package Microsoft.EntityFrameworkCore.Tools
 dotnet add package System.IdentityModel.Tokens.Jwt
 
 dotnet add package BCrypt.Net-Next
-dotnet ef migrations add Initial
+dotnet user-secrets init
+dotnet user-secrets set "Jwt:Key" "COLOQUE_AQUI_UMA_CHAVE_GRANDE_DE_PELO_MENOS_64_BYTES_PARA_HS512"
+dotnet ef migrations add MySqlInitial
 dotnet ef database update
-dotnet run
+dotnet new gitignore
+
+./run-backend.ps1
+
+
 
 #rodar
-dotnet run
-
-dotnet new gitignore
+./run-backend.ps1

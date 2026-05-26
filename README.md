@@ -2,7 +2,7 @@
 
 Workspace com dois projetos:
 
-- backend: API ASP.NET Core + SignalR + SQLite
+- backend: API ASP.NET Core + SignalR + MySQL
 - frontend: React + Vite + SignalR client
 
 ## Start rapido

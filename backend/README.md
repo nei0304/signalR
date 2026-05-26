@@ -1,37 +1,39 @@
 # Backend - Chat API + SignalR
 
-API em ASP.NET Core para autenticacao com JWT e chat em tempo real com SignalR, usando SQLite para persistencia de usuarios e mensagens.
+API ASP.NET Core com autenticacao JWT, refresh token, persistencia em MySQL e chat em tempo real com SignalR.
 
 ## Visao geral
 
-Este projeto expoe:
+O backend expoe:
 
-- endpoints HTTP para registro e login
-- um Hub SignalR protegido por JWT
-- persistencia de historico das salas
+- Endpoints de autenticacao e sessao
+- Hub SignalR protegido por JWT
+- Persistencia de usuarios, mensagens e refresh tokens
+- Swagger em ambiente Development
 
-## Tecnologias
+## Stack
 
-- .NET 10 (ASP.NET Core minimal API)
-- SignalR
+- .NET 10 (minimal API)
+- Entity Framework Core + Pomelo MySQL
 - JWT Bearer Authentication
-- Entity Framework Core
-- SQLite
-- BCrypt para hash de senha
+- SignalR
+- BCrypt
 
 ## Estrutura
 
 - Program.cs: configuracao da aplicacao, endpoints e ChatHub
-- Data/AppDbContext.cs: contexto do EF Core
-- Services/TokenService.cs: geracao de token JWT
-- Models/Message.cs e User: entidades de dominio
-- appsettings.json: configuracoes gerais e chave JWT
+- Data/AppDbContext.cs: mapeamento EF Core
+- Services/TokenService.cs: criacao e renovacao de tokens
+- Models/Message.cs: entidades User, Message e RefreshToken
+- Migrations/: historico de migracoes
+- run-backend.ps1: script para executar sem conflito de processo
 
-## Requisitos
+## Pre-requisitos
 
-- SDK .NET 10 instalado
+- SDK .NET 10+
+- MySQL em execucao
 
-## Como executar
+## Configuracao local
 
 1. Restaurar dependencias:
 
@@ -39,42 +41,62 @@ Este projeto expoe:
 dotnet restore
 ```
 
-2. Executar a API:
+2. Definir chave JWT (uma unica vez por maquina):
 
 ```bash
-dotnet run
+dotnet user-secrets init
+dotnet user-secrets set "Jwt:Key" "COLOQUE_AQUI_UMA_CHAVE_GRANDE_DE_PELO_MENOS_64_BYTES_PARA_HS512"
 ```
 
-3. URL local (perfil HTTP):
+3. Validar connection string em appsettings.json (ConnectionStrings:DefaultConnection).
+
+4. Aplicar migracoes:
+
+```bash
+dotnet ef database update
+```
+
+## Como executar
+
+No diretorio backend:
+
+```bash
+./run-backend.ps1
+```
+
+Se estiver no diretorio raiz do repositorio:
+
+```bash
+./backend/run-backend.ps1
+```
+
+API local:
 
 - http://localhost:5267
 
-## Configuracao JWT
+Swagger (Development):
 
-A chave esta em appsettings.json:
+- http://localhost:5267/swagger
 
-```json
-"Jwt": {
-  "Key": "CHAVE_SUPER_SECRETA_DE_32_CHARS_MINIMO_123456"
-}
-```
+## JWT
 
-Para ambientes reais, mova essa chave para variavel de ambiente/secrets e use valor forte.
+- A chave nao deve ficar no repositorio.
+- Em desenvolvimento: user-secrets
+- Em producao: variavel de ambiente Jwt__Key
 
 ## Banco de dados
 
-- Provider: SQLite
-- Arquivo: chat.db (na pasta do backend)
+- Provider: MySQL
+- Tabelas principais: Users, Messages, RefreshTokens
+- Connection string: appsettings.json
 
-A aplicacao usa o contexto AppDbContext para Users e Messages.
-
-## Endpoints HTTP
+## Endpoints
 
 ### POST /register
 
-Registra um usuario novo.
+Cria usuario.
 
-Body:
+Request:
 
 ```json
 {
@@ -83,16 +105,16 @@ Body:
 }
 ```
 
-Resposta:
+Retornos:
 
-- 200 OK quando cadastrado
-- 400 BadRequest se usuario ja existe
+- 200: usuario criado
+- 400: usuario ja existe
 
 ### POST /login
 
-Autentica usuario e retorna token JWT.
+Autentica e retorna sessao.
 
-Body:
+Request:
 
 ```json
 {
@@ -101,48 +123,71 @@ Body:
 }
 ```
 
-Resposta 200:
+Response 200:
 
 ```json
 {
-  "token": "<jwt>",
-  "username": "alice"
+  "accessToken": "<jwt>",
+  "refreshToken": "<refresh>",
+  "user": {
+    "id": 1,
+    "username": "alice"
+  }
 }
 ```
 
-Resposta:
+### POST /refresh
 
-- 401 Unauthorized para credenciais invalidas
+Renova token via refresh token.
 
-## Hub SignalR
+### GET /me
 
-- Rota: /chat
-- Requer autenticacao (Authorize)
+Retorna dados do usuario autenticado.
 
-### Metodos do Hub
+### POST /logout
 
-- JoinRoom(room)
-  - adiciona conexao ao grupo da sala
-  - envia LoadHistory para o caller com as ultimas 50 mensagens
-  - emite UserJoined para o grupo
+Revoga refresh token enviado no body.
 
-- SendMessage(room, message)
-  - persiste mensagem no banco
-  - emite ReceiveMessage para o grupo
+## SignalR
 
-### Eventos enviados para o frontend
-
-- LoadHistory(history)
-- ReceiveMessage(message)
-- UserJoined(username)
+- Hub: /chat
+- Requer token JWT
+- Metodos:
+  - JoinRoom(room)
+  - SendMessage(room, message)
+  - Typing(room)
+- Eventos enviados:
+  - LoadHistory
+  - ReceiveMessage
+  - UserJoined
+  - UserTyping
+  - UserLeft
 
 ## CORS
 
-CORS configurado para aceitar frontend em:
+Origens liberadas:
 
 - http://localhost:5173
+- http://127.0.0.1:5173
+- https://localhost:5173
+- https://127.0.0.1:5173
 
-## Observacoes
+## Troubleshooting
 
-- O pacote Microsoft.AspNetCore.SignalR aparece no projeto e pode gerar warning de dependencia possivelmente desnecessaria em runtime atual do ASP.NET Core.
-- Para producao, configure issuer/audience no JWT e secret fora do repositorio.
+### Erro de arquivo bloqueado no build
+
+Se aparecer erro de backend.exe em uso, existe outro processo rodando.
+
+Use:
+
+```bash
+./run-backend.ps1
+```
+
+Esse script encerra o processo anterior antes de subir a API.
+
+### Erro 500 no login por chave JWT
+
+Se a chave for curta para HS512, o login pode falhar com status 500.
+
+Defina chave forte em user-secrets com tamanho grande (recomendado 64+ bytes).

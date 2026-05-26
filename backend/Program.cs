@@ -11,58 +11,71 @@ using ChatApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Banco de dados
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// 1. MySQL - pega connection string do appsettings
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<AppDbContext>(opt =>
-    opt.UseSqlite("Data Source=chat.db"));
+    opt.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
 
-// 2. JWT Auth
+// 2. JWT Auth - igual antes
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-  .AddJwtBearer(opt => {
-       opt.TokenValidationParameters = new TokenValidationParameters {
-           ValidateIssuerSigningKey = true,
-           IssuerSigningKey = new SymmetricSecurityKey(
-               Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)),
-           ValidateIssuer = false,
-           ValidateAudience = false,
-           ClockSkew = TimeSpan.Zero
-       };
+.AddJwtBearer(opt => {
+      opt.TokenValidationParameters = new TokenValidationParameters {
+          ValidateIssuerSigningKey = true,
+          IssuerSigningKey = new SymmetricSecurityKey(
+              Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)),
+          ValidateIssuer = false,
+          ValidateAudience = false,
+          ClockSkew = TimeSpan.Zero
+      };
 
-       // SignalR lê token do query string
-       opt.Events = new JwtBearerEvents {
-           OnMessageReceived = context => {
-               var accessToken = context.Request.Query["access_token"];
-               var path = context.HttpContext.Request.Path;
-               if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/chat"))
-               {
-                   context.Token = accessToken;
-               }
-               return Task.CompletedTask;
-           }
-       };
-   });
+      opt.Events = new JwtBearerEvents {
+          OnMessageReceived = context => {
+              var accessToken = context.Request.Query["access_token"];
+              var path = context.HttpContext.Request.Path;
+              if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/chat"))
+              {
+                  context.Token = accessToken;
+              }
+              return Task.CompletedTask;
+          }
+      };
+  });
 
 builder.Services.AddAuthorization();
 builder.Services.AddScoped<TokenService>();
 
-// 3. CORS pro React
 builder.Services.AddCors(opt => {
     opt.AddDefaultPolicy(p => p
-    .WithOrigins("http://localhost:5173")
-    .AllowAnyHeader()
-    .AllowAnyMethod()
-    .AllowCredentials());
+    .WithOrigins(
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "https://localhost:5173",
+            "https://127.0.0.1:5173"
+            
+            )
+  .AllowAnyHeader()
+  .AllowAnyMethod()
+  .AllowCredentials());
 });
 
-// 4. SignalR
 builder.Services.AddSignalR();
 
 var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// 5. Endpoints de Auth
+// Endpoints - tudo igual ao anterior
 app.MapPost("/register", async (AppDbContext db, User user) => {
     if (await db.Users.AnyAsync(u => u.Username == user.Username))
         return Results.BadRequest(new { error = "Usuário já existe" });
@@ -103,15 +116,13 @@ app.MapPost("/logout", [Authorize] async (AppDbContext db, RefreshRequest req) =
     return Results.Ok(new { message = "Logout feito" });
 });
 
-// 6. SignalR Hub
 app.MapHub<ChatHub>("/chat");
 
 app.Run();
 
-// Records
 public record RefreshRequest(string RefreshToken);
 
-// Hub com Auth + Persistência
+// ChatHub igual ao anterior
 [Authorize]
 public class ChatHub : Hub
 {
@@ -127,18 +138,18 @@ public class ChatHub : Hub
         await Groups.AddToGroupAsync(Context.ConnectionId, room);
 
         var history = await _db.Messages
-         .Where(m => m.Room == room)
-         .OrderByDescending(m => m.SentAt)
-         .Take(50)
-         .OrderBy(m => m.SentAt)
-         .Select(m => new {
-              m.Id,
-              m.Room,
-              m.Username,
-              m.Content,
-              m.SentAt
-          })
-         .ToListAsync();
+       .Where(m => m.Room == room)
+       .OrderByDescending(m => m.SentAt)
+       .Take(50)
+       .OrderBy(m => m.SentAt)
+       .Select(m => new {
+             m.Id,
+             m.Room,
+             m.Username,
+             m.Content,
+             m.SentAt
+         })
+       .ToListAsync();
 
         await Clients.Caller.SendAsync("LoadHistory", history);
 
@@ -149,7 +160,6 @@ public class ChatHub : Hub
     public async Task SendMessage(string room, string message)
     {
         var username = Context.User?.Identity?.Name?? "Anon";
-        var userId = int.Parse(Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value?? "0");
 
         var msg = new Message {
             Room = room,

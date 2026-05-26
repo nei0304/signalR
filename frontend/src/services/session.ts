@@ -1,8 +1,14 @@
 export type SessionState = {
-  token: string | null;
+  accessToken: string | null;
   username: string;
   room: string;
   joined: boolean;
+};
+
+type LegacySessionState = {
+  token?: unknown;
+  user?: unknown;
+  username?: unknown;
 };
 
 const SESSION_KEY = "signalr-chat-session";
@@ -12,24 +18,43 @@ export function loadSession(): SessionState {
     const raw = localStorage.getItem(SESSION_KEY);
     if (!raw) {
       return {
-        token: null,
+        accessToken: null,
         username: "",
         room: "geral",
         joined: false,
       };
     }
 
-    const parsed = JSON.parse(raw) as Partial<SessionState>;
+    const parsed = JSON.parse(raw) as Partial<SessionState> & LegacySessionState;
+
+    const accessToken =
+      typeof parsed.accessToken === "string"
+        ? parsed.accessToken
+        : typeof parsed.token === "string"
+          ? parsed.token
+          : null;
+
+    const username =
+      typeof parsed.username === "string"
+        ? parsed.username
+        : typeof parsed.user === "string"
+          ? parsed.user
+          : typeof parsed.user === "object" &&
+              parsed.user !== null &&
+              "username" in parsed.user &&
+              typeof (parsed.user as { username?: unknown }).username === "string"
+            ? (parsed.user as { username: string }).username
+            : "";
 
     return {
-      token: typeof parsed.token === "string" ? parsed.token : null,
-      username: typeof parsed.username === "string" ? parsed.username : "",
+      accessToken,
+      username,
       room: typeof parsed.room === "string" ? parsed.room : "geral",
       joined: Boolean(parsed.joined),
     };
   } catch {
     return {
-      token: null,
+      accessToken: null,
       username: "",
       room: "geral",
       joined: false,

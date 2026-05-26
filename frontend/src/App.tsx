@@ -11,9 +11,11 @@ function App() {
   const [initialSession] = useState(loadSession);
 
   const [authMode, setAuthMode] = useState<AuthMode>("login");
-  const [username, setUsername] = useState(initialSession.username);
+  const [username, setUsername] = useState(
+    typeof initialSession.username === "string" ? initialSession.username : "",
+  );
   const [password, setPassword] = useState("");
-  const [token, setToken] = useState<string | null>(initialSession.token);
+  const [token, setToken] = useState<string | null>(initialSession.accessToken);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
 
@@ -36,7 +38,7 @@ function App() {
     }
 
     saveSession({
-      token,
+      accessToken: token,
       username,
       room,
       joined,
@@ -52,12 +54,14 @@ function App() {
 
     try {
       const result = await requestAuth(authMode, username.trim(), password);
-      setToken(result.token);
-      setUsername(result.username || readUsernameFromToken(result.token));
+      setToken(result.accessToken);
+      setUsername(
+        result.user.username || readUsernameFromToken(result.accessToken),
+      );
       setJoined(false);
       setPassword("");
     } catch (error) {
-      console.error(error);
+      console.error("Erro ao autenticar:", error);
       setAuthError(
         error instanceof Error ? error.message : "Falha de autenticacao.",
       );
